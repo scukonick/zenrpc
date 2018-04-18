@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/semrush/zenrpc/parser"
+	"github.com/marusama/zenrpc/parser"
 	"text/template"
 )
 
@@ -58,8 +58,8 @@ import (
 	"encoding/json"
 	"context"
 
-	"github.com/semrush/zenrpc"
-	"github.com/semrush/zenrpc/smd"
+	"github.com/marusama/zenrpc"
+	"github.com/marusama/zenrpc/smd"
 
 	{{ range .ImportsForGeneration}}
 		{{if .Name}}{{.Name.Name}} {{end}}{{.Path.Value}}
