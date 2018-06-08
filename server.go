@@ -73,6 +73,9 @@ type Options struct {
 
 	// HideErrorDataField removes data field from response error
 	HideErrorDataField bool
+
+	// BuildMethodEndpointPathFunc build method endpoint path
+	BuildMethodEndpointPathFunc func(namespace string, method string) string
 }
 
 // Server is JSON-RPC 2.0 Server.
@@ -97,6 +100,15 @@ func NewServer(opts Options) Server {
 	if opts.Upgrader == nil {
 		opts.Upgrader = &websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool { return opts.AllowCORS },
+		}
+	}
+
+	if opts.BuildMethodEndpointPathFunc == nil {
+		opts.BuildMethodEndpointPathFunc = func(namespace string, method string) string {
+			if namespace == "" {
+				return "/" + method
+			}
+			return "/" + namespace + "/" + method
 		}
 	}
 
@@ -278,6 +290,21 @@ func (s Server) SMD() smd.Schema {
 	}
 
 	return sch
+}
+
+// MethodEndpoints returns method endpoints for all registered methods.
+func (s *Server) MethodEndpoints() map[string]http.Handler {
+	endpoints := make(map[string]http.Handler)
+
+	for namespace, service := range s.services {
+		info := service.SMD()
+		for method := range info.Methods {
+			path := s.options.BuildMethodEndpointPathFunc(namespace, method)
+			endpoints[path] = s
+		}
+	}
+
+	return endpoints
 }
 
 // IsArray checks json message if it array or object.
