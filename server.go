@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path"
 	"strings"
 	"sync"
 	"unicode"
@@ -106,9 +107,9 @@ func NewServer(opts Options) Server {
 	if opts.BuildMethodEndpointPathFunc == nil {
 		opts.BuildMethodEndpointPathFunc = func(namespace string, method string) string {
 			if namespace == "" {
-				return "/" + method
+				return path.Join(opts.TargetURL, method)
 			}
-			return "/" + namespace + "/" + method
+			return path.Join(opts.TargetURL, namespace, method)
 		}
 	}
 
