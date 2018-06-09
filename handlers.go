@@ -24,6 +24,19 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// check for openapi3 parameter and server settings and write schema if all conditions met,
+	if _, ok := r.URL.Query()["openapi3"]; ok && s.options.ExposeOpenAPI3 && r.Method == http.MethodGet {
+		w.Header().Set("Content-Type", contentTypeJSON)
+		w.Header().Set("Allow", "OPTIONS, GET, POST")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "OPTIONS, GET, POST")
+		w.Header().Set("Access-Control-Allow-Headers", "X-PINGOTHER, Content-Type")
+		w.Header().Set("Access-Control-Max-Age", "86400")
+		b, _ := json.Marshal(s.OpenAPI3())
+		w.Write(b)
+		return
+	}
+
 	// check for content-type and POST method.
 	if !s.options.DisableTransportChecks {
 		if !strings.HasPrefix(r.Header.Get("Content-Type"), contentTypeJSON) {

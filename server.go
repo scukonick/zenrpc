@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"reflect"
 	"strings"
 	"sync"
 	"unicode"
 
 	"github.com/gorilla/websocket"
+	"github.com/marusama/kin-openapi/openapi3"
+	"github.com/marusama/kin-openapi/openapi3gen"
 	"github.com/marusama/zenrpc/smd"
 )
 
@@ -57,11 +60,17 @@ type Options struct {
 	// BatchMaxLen sets maximum quantity of requests in single batch.
 	BatchMaxLen int
 
+	// TargetHost target host.
+	TargetHost string
+
 	// TargetURL is RPC endpoint.
 	TargetURL string
 
 	// ExposeSMD exposes SMD schema with ?smd GET parameter.
 	ExposeSMD bool
+
+	// ExposeOpenAPI3 exposes OpenAPI 3 with ?openapi3 GET parameter.
+	ExposeOpenAPI3 bool
 
 	// DisableTransportChecks disables Content-Type and methods checks. Use only for development mode.
 	DisableTransportChecks bool
@@ -300,12 +309,123 @@ func (s *Server) MethodEndpoints() map[string]http.Handler {
 	for namespace, service := range s.services {
 		info := service.SMD()
 		for method := range info.Methods {
-			path := s.options.BuildMethodEndpointPathFunc(namespace, method)
-			endpoints[path] = s
+			p := s.options.BuildMethodEndpointPathFunc(namespace, method)
+			endpoints[p] = s
 		}
 	}
 
 	return endpoints
+}
+
+// OpenAPI3 returns OpenAPI3 object with all registered methods.
+func (s Server) OpenAPI3() *openapi3.Swagger {
+
+	swagger := &openapi3.Swagger{
+		OpenAPI: "3.0",
+		Paths:   openapi3.Paths{},
+		Servers: openapi3.Servers{
+			&openapi3.Server{
+				URL: s.options.TargetHost,
+			},
+		},
+	}
+
+	for namespace, v := range s.services {
+		info := v.SMD()
+		srv := reflect.ValueOf(v)
+		for methodName, method := range info.Methods {
+			p := s.options.BuildMethodEndpointPathFunc(namespace, methodName)
+			rpcMethodName := methodName
+			if namespace != "" {
+				rpcMethodName = namespace + "." + rpcMethodName
+			}
+
+			refMethodType := srv.MethodByName(methodName).Type()
+
+			// request
+			requestBody := openapi3.NewObjectSchema()
+			{
+				requestBody.Required = []string{"id", "jsonrpc", "method", "params"}
+				requestBody.AdditionalPropertiesAllowed = false
+
+				requestBody.WithProperty("id", openapi3.NewStringSchema())
+				requestBody.WithProperty("jsonrpc", openapi3.NewStringSchema().WithEnum("2.0"))
+				requestBody.WithProperty("method", openapi3.NewStringSchema().WithEnum(rpcMethodName))
+
+				params := openapi3.NewObjectSchema()
+				requestBody.WithProperty("params", params)
+
+				requiredParams := make([]string, 0, len(method.Parameters))
+				for i, p := range method.Parameters {
+					paramType := refMethodType.In(i)
+
+					g := openapi3gen.NewGenerator()
+					schemaRef, err := g.GenerateSchemaRef(paramType)
+					if err != nil {
+						panic(err)
+					}
+					for ref := range g.SchemaRefs {
+						ref.Ref = ""
+					}
+
+					params.WithProperty(p.Name, schemaRef.Value)
+					if !p.Optional {
+						requiredParams = append(requiredParams, p.Name)
+					}
+				}
+				params.Required = requiredParams
+			}
+
+			// response
+			responseBody := openapi3.NewObjectSchema()
+			{
+				responseBody.Required = []string{"id", "jsonrpc"}
+
+				responseBody.WithProperty("id", openapi3.NewStringSchema())
+				responseBody.WithProperty("jsonrpc", openapi3.NewStringSchema().WithEnum("2.0"))
+
+				responseBody.WithProperty("error", openapi3.NewObjectSchema().
+					WithProperty("code", openapi3.NewInt64Schema()).
+					WithProperty("message", openapi3.NewStringSchema()))
+
+				var resultSchema *openapi3.Schema
+				if refMethodType.NumOut() > 0 {
+					resultType := refMethodType.Out(0)
+					g := openapi3gen.NewGenerator()
+					schemaRef, err := g.GenerateSchemaRef(resultType)
+					if err != nil {
+						panic(err)
+					}
+					for ref := range g.SchemaRefs {
+						ref.Ref = ""
+					}
+					resultSchema = schemaRef.Value
+				} else {
+					resultSchema = openapi3.NewObjectSchema()
+				}
+				responseBody.WithProperty("result", resultSchema)
+			}
+
+			swagger.Paths[p] = &openapi3.PathItem{
+				Post: &openapi3.Operation{
+					Summary: method.Description,
+					RequestBody: &openapi3.RequestBodyRef{
+						Value: &openapi3.RequestBody{
+							Required: true,
+							Content:  openapi3.NewContentWithJSONSchema(requestBody),
+						},
+					},
+					Responses: openapi3.Responses{
+						"200": &openapi3.ResponseRef{
+							Value: openapi3.NewResponse().WithJSONSchema(responseBody),
+						},
+					},
+				},
+			}
+		}
+	}
+
+	return swagger
 }
 
 // IsArray checks json message if it array or object.
