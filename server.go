@@ -356,8 +356,9 @@ func (s Server) OpenAPI3() *openapi3.Swagger {
 				requestBody.WithProperty("params", params)
 
 				requiredParams := make([]string, 0, len(method.Parameters))
+				paramOffset := refMethodType.NumIn() - len(method.Parameters)
 				for i, p := range method.Parameters {
-					paramType := refMethodType.In(i)
+					paramType := refMethodType.In(paramOffset + i)
 
 					g := openapi3gen.NewGenerator()
 					schemaRef, err := g.GenerateSchemaRef(paramType)
