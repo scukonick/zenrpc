@@ -53,6 +53,16 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if r.Method == http.MethodOptions && s.options.AllowCORS {
+		w.Header().Set("Allow", "OPTIONS, GET, POST")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "OPTIONS, GET, POST")
+		w.Header().Set("Access-Control-Allow-Headers", "X-PINGOTHER, Content-Type")
+		w.Header().Set("Access-Control-Max-Age", "86400")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	// check for content-type and POST method.
 	if !s.options.DisableTransportChecks {
 		if !strings.HasPrefix(r.Header.Get("Content-Type"), contentTypeJSON) {
