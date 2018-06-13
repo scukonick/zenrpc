@@ -387,7 +387,8 @@ func (s Server) OpenAPI3() *openapi3.Swagger {
 
 	for namespace, v := range s.services {
 		info := v.SMD()
-		srv := reflect.ValueOf(v)
+		srvType := reflect.ValueOf(v).Type()
+		ptrSrvType := reflect.PtrTo(srvType)
 		for methodName, method := range info.Methods {
 			p := s.options.BuildMethodEndpointPathFunc(namespace, methodName)
 			rpcMethodName := methodName
@@ -395,7 +396,11 @@ func (s Server) OpenAPI3() *openapi3.Swagger {
 				rpcMethodName = namespace + "." + rpcMethodName
 			}
 
-			refMethodType := srv.MethodByName(methodName).Type()
+			methodType, ok := srvType.MethodByName(methodName)
+			if !ok {
+				methodType, _ = ptrSrvType.MethodByName(methodName)
+			}
+			refMethodType := methodType.Type
 
 			// request
 			requestBody := openapi3.NewObjectSchema()
