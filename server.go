@@ -357,6 +357,15 @@ func (s Server) Swagger() *openapi2.Swagger {
 		swagger.Paths = correctPaths
 	}
 
+	// fill description
+	for itemPath, item := range swagger.Paths {
+		for code, resp := range item.Post.Responses {
+			if resp.Description == "" {
+				resp.Description = itemPath + "/" + code
+			}
+		}
+	}
+
 	if s.options.PostProcessSwaggerFunc != nil {
 		s.options.PostProcessSwaggerFunc(swagger)
 	}
