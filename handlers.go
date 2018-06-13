@@ -17,24 +17,40 @@ type Printer interface {
 // ServeHTTP process JSON-RPC 2.0 requests via HTTP.
 // http://www.simple-is-better.org/json-rpc/transport_http.html
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// check for smd parameter and server settings and write schema if all conditions met,
-	if _, ok := r.URL.Query()["smd"]; ok && s.options.ExposeSMD && r.Method == http.MethodGet {
-		b, _ := json.Marshal(s.SMD())
-		w.Write(b)
-		return
-	}
+	// check for smd, swagger or openapi3 parameter and server settings and write schema if all conditions met,
+	if r.Method == http.MethodGet {
+		smd, swagger, openAPI3 := false, false, false
+		if s.options.ExposeSMD {
+			_, smd = r.URL.Query()["smd"]
+		}
+		if s.options.ExposeSwagger {
+			_, swagger = r.URL.Query()["swagger.json"]
+		}
+		if s.options.ExposeOpenAPI3 {
+			_, openAPI3 = r.URL.Query()["openapi3.json"]
+		}
+		if smd || swagger || openAPI3 {
+			w.Header().Set("Content-Type", contentTypeJSON)
+			if s.options.AllowCORS {
+				w.Header().Set("Allow", "OPTIONS, GET, POST")
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Access-Control-Allow-Methods", "OPTIONS, GET, POST")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+				w.Header().Set("Access-Control-Max-Age", "86400")
+			}
 
-	// check for openapi3 parameter and server settings and write schema if all conditions met,
-	if _, ok := r.URL.Query()["openapi3"]; ok && s.options.ExposeOpenAPI3 && r.Method == http.MethodGet {
-		w.Header().Set("Content-Type", contentTypeJSON)
-		w.Header().Set("Allow", "OPTIONS, GET, POST")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "OPTIONS, GET, POST")
-		w.Header().Set("Access-Control-Allow-Headers", "X-PINGOTHER, Content-Type")
-		w.Header().Set("Access-Control-Max-Age", "86400")
-		b, _ := json.Marshal(s.OpenAPI3())
-		w.Write(b)
-		return
+			var b []byte
+			switch {
+			case smd:
+				b, _ = json.Marshal(s.SMD())
+			case swagger:
+				b, _ = json.Marshal(s.Swagger())
+			case openAPI3:
+				b, _ = json.Marshal(s.OpenAPI3())
+			}
+			w.Write(b)
+			return
+		}
 	}
 
 	// check for content-type and POST method.
@@ -70,7 +86,11 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// set headers
 	w.Header().Set("Content-Type", contentTypeJSON)
 	if s.options.AllowCORS {
+		w.Header().Set("Allow", "OPTIONS, GET, POST")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "OPTIONS, GET, POST")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Max-Age", "86400")
 	}
 
 	// marshals data and write it to client.

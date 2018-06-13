@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/gorilla/websocket"
+	"github.com/marusama/kin-openapi/openapi2"
 	"github.com/marusama/kin-openapi/openapi3"
 	"github.com/marusama/kin-openapi/openapi3gen"
 	"github.com/marusama/zenrpc/smd"
@@ -69,7 +70,10 @@ type Options struct {
 	// ExposeSMD exposes SMD schema with ?smd GET parameter.
 	ExposeSMD bool
 
-	// ExposeOpenAPI3 exposes OpenAPI 3 with ?openapi3 GET parameter.
+	// ExposeSwagger exposes Swagger json (OpenAPI 2) with ?swagger.json GET parameter.
+	ExposeSwagger bool
+
+	// ExposeOpenAPI3 exposes OpenAPI 3 with ?openapi3.json GET parameter.
 	ExposeOpenAPI3 bool
 
 	// DisableTransportChecks disables Content-Type and methods checks. Use only for development mode.
@@ -86,6 +90,12 @@ type Options struct {
 
 	// BuildMethodEndpointPathFunc build method endpoint path
 	BuildMethodEndpointPathFunc func(namespace string, method string) string
+
+	// PostProcessSwaggerFunc post process swagger object
+	PostProcessSwaggerFunc func(swagger *openapi2.Swagger)
+
+	// PostProcessOpenAPI3Func post process OpenAPI 3 object
+	PostProcessOpenAPI3Func func(swagger *openapi3.Swagger)
 }
 
 // Server is JSON-RPC 2.0 Server.
@@ -317,6 +327,17 @@ func (s *Server) MethodEndpoints() map[string]http.Handler {
 	return endpoints
 }
 
+// Swagger returns Swagger object (OpenAPI 2) with all registered methods.
+func (s Server) Swagger() *openapi2.Swagger {
+
+	swagger := openapi2.NewSwagger()
+
+	if s.options.PostProcessSwaggerFunc != nil {
+		s.options.PostProcessSwaggerFunc(swagger)
+	}
+	return swagger
+}
+
 // OpenAPI3 returns OpenAPI3 object with all registered methods.
 func (s Server) OpenAPI3() *openapi3.Swagger {
 
@@ -426,6 +447,9 @@ func (s Server) OpenAPI3() *openapi3.Swagger {
 		}
 	}
 
+	if s.options.PostProcessOpenAPI3Func != nil {
+		s.options.PostProcessOpenAPI3Func(swagger)
+	}
 	return swagger
 }
 
