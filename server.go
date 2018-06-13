@@ -14,6 +14,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/marusama/kin-openapi/openapi2"
+	"github.com/marusama/kin-openapi/openapi2conv"
 	"github.com/marusama/kin-openapi/openapi3"
 	"github.com/marusama/kin-openapi/openapi3gen"
 	"github.com/marusama/zenrpc/smd"
@@ -330,7 +331,31 @@ func (s *Server) MethodEndpoints() map[string]http.Handler {
 // Swagger returns Swagger object (OpenAPI 2) with all registered methods.
 func (s Server) Swagger() *openapi2.Swagger {
 
-	swagger := openapi2.NewSwagger()
+	swagger, err := openapi2conv.FromV3Swagger(s.OpenAPI3())
+	if err != nil {
+		return &openapi2.Swagger{
+			Swagger: "2.0",
+			Info: openapi3.Info{
+				Title:       "error",
+				Description: err.Error(),
+			},
+		}
+	}
+	swagger.Swagger = "2.0"
+	swagger.Host = s.options.TargetHost
+	swagger.BasePath = s.options.TargetURL
+	swagger.Consumes = []string{contentTypeJSON}
+	swagger.Produces = []string{contentTypeJSON}
+
+	// workaround: cut basePath from path
+	if swagger.BasePath != "" && swagger.BasePath != "/" {
+		correctPaths := make(map[string]*openapi2.PathItem, len(swagger.Paths))
+		for oldPath, item := range swagger.Paths {
+			newPath := oldPath[len(swagger.BasePath):]
+			correctPaths[newPath] = item
+		}
+		swagger.Paths = correctPaths
+	}
 
 	if s.options.PostProcessSwaggerFunc != nil {
 		s.options.PostProcessSwaggerFunc(swagger)
