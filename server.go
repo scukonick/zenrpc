@@ -405,6 +405,7 @@ func (s Server) OpenAPI3() *openapi3.Swagger {
 			// request
 			requestBody := openapi3.NewObjectSchema()
 			{
+				requestBody.Description = method.Description
 				requestBody.Required = []string{"id", "jsonrpc", "method", "params"}
 				requestBody.AdditionalPropertiesAllowed = false
 
@@ -469,7 +470,8 @@ func (s Server) OpenAPI3() *openapi3.Swagger {
 
 			swagger.Paths[p] = &openapi3.PathItem{
 				Post: &openapi3.Operation{
-					Summary: method.Description,
+					Summary:     method.Description,
+					Description: method.Description,
 					RequestBody: &openapi3.RequestBodyRef{
 						Value: &openapi3.RequestBody{
 							Required: true,
