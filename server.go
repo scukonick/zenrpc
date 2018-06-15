@@ -7,11 +7,16 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"reflect"
 	"strings"
 	"sync"
 	"unicode"
 
 	"github.com/gorilla/websocket"
+	"github.com/marusama/kin-openapi/openapi2"
+	"github.com/marusama/kin-openapi/openapi2conv"
+	"github.com/marusama/kin-openapi/openapi3"
+	"github.com/marusama/kin-openapi/openapi3gen"
 	"github.com/marusama/zenrpc/smd"
 )
 
@@ -57,11 +62,20 @@ type Options struct {
 	// BatchMaxLen sets maximum quantity of requests in single batch.
 	BatchMaxLen int
 
+	// TargetHost target host.
+	TargetHost string
+
 	// TargetURL is RPC endpoint.
 	TargetURL string
 
 	// ExposeSMD exposes SMD schema with ?smd GET parameter.
 	ExposeSMD bool
+
+	// ExposeSwagger exposes Swagger json (OpenAPI 2) with ?swagger.json GET parameter.
+	ExposeSwagger bool
+
+	// ExposeOpenAPI3 exposes OpenAPI 3 with ?openapi3.json GET parameter.
+	ExposeOpenAPI3 bool
 
 	// DisableTransportChecks disables Content-Type and methods checks. Use only for development mode.
 	DisableTransportChecks bool
@@ -77,6 +91,12 @@ type Options struct {
 
 	// BuildMethodEndpointPathFunc build method endpoint path
 	BuildMethodEndpointPathFunc func(namespace string, method string) string
+
+	// PostProcessSwaggerFunc post process swagger object
+	PostProcessSwaggerFunc func(swagger *openapi2.Swagger)
+
+	// PostProcessOpenAPI3Func post process OpenAPI 3 object
+	PostProcessOpenAPI3Func func(swagger *openapi3.Swagger)
 }
 
 // Server is JSON-RPC 2.0 Server.
@@ -300,12 +320,178 @@ func (s *Server) MethodEndpoints() map[string]http.Handler {
 	for namespace, service := range s.services {
 		info := service.SMD()
 		for method := range info.Methods {
-			path := s.options.BuildMethodEndpointPathFunc(namespace, method)
-			endpoints[path] = s
+			p := s.options.BuildMethodEndpointPathFunc(namespace, method)
+			endpoints[p] = s
 		}
 	}
 
 	return endpoints
+}
+
+// Swagger returns Swagger object (OpenAPI 2) with all registered methods.
+func (s Server) Swagger() *openapi2.Swagger {
+
+	swagger, err := openapi2conv.FromV3Swagger(s.OpenAPI3())
+	if err != nil {
+		return &openapi2.Swagger{
+			Swagger: "2.0",
+			Info: openapi3.Info{
+				Title:       "error",
+				Description: err.Error(),
+			},
+		}
+	}
+	swagger.Swagger = "2.0"
+	swagger.Host = s.options.TargetHost
+	swagger.BasePath = s.options.TargetURL
+	swagger.Consumes = []string{contentTypeJSON}
+	swagger.Produces = []string{contentTypeJSON}
+
+	// workaround: cut basePath from path
+	if swagger.BasePath != "" && swagger.BasePath != "/" {
+		correctPaths := make(map[string]*openapi2.PathItem, len(swagger.Paths))
+		for oldPath, item := range swagger.Paths {
+			newPath := oldPath[len(swagger.BasePath):]
+			correctPaths[newPath] = item
+		}
+		swagger.Paths = correctPaths
+	}
+
+	// fill description
+	for itemPath, item := range swagger.Paths {
+		for code, resp := range item.Post.Responses {
+			if resp.Description == "" {
+				resp.Description = itemPath + "/" + code
+			}
+		}
+	}
+
+	if s.options.PostProcessSwaggerFunc != nil {
+		s.options.PostProcessSwaggerFunc(swagger)
+	}
+	return swagger
+}
+
+// OpenAPI3 returns OpenAPI3 object with all registered methods.
+func (s Server) OpenAPI3() *openapi3.Swagger {
+
+	swagger := &openapi3.Swagger{
+		OpenAPI: "3.0",
+		Paths:   openapi3.Paths{},
+		Servers: openapi3.Servers{
+			&openapi3.Server{
+				URL: s.options.TargetHost,
+			},
+		},
+	}
+
+	for namespace, v := range s.services {
+		info := v.SMD()
+		srvType := reflect.ValueOf(v).Type()
+		ptrSrvType := reflect.PtrTo(srvType)
+		for methodName, method := range info.Methods {
+			p := s.options.BuildMethodEndpointPathFunc(namespace, methodName)
+			rpcMethodName := methodName
+			if namespace != "" {
+				rpcMethodName = namespace + "." + rpcMethodName
+			}
+
+			methodType, ok := srvType.MethodByName(methodName)
+			if !ok {
+				methodType, _ = ptrSrvType.MethodByName(methodName)
+			}
+			refMethodType := methodType.Type
+
+			// request
+			requestBody := openapi3.NewObjectSchema()
+			{
+				requestBody.Description = method.Description
+				requestBody.Required = []string{"id", "jsonrpc", "method", "params"}
+				requestBody.AdditionalPropertiesAllowed = false
+
+				requestBody.WithProperty("id", openapi3.NewStringSchema())
+				requestBody.WithProperty("jsonrpc", openapi3.NewStringSchema().WithEnum("2.0"))
+				requestBody.WithProperty("method", openapi3.NewStringSchema().WithEnum(rpcMethodName))
+
+				params := openapi3.NewObjectSchema()
+				requestBody.WithProperty("params", params)
+
+				requiredParams := make([]string, 0, len(method.Parameters))
+				paramOffset := refMethodType.NumIn() - len(method.Parameters)
+				for i, p := range method.Parameters {
+					paramType := refMethodType.In(paramOffset + i)
+
+					g := openapi3gen.NewGenerator()
+					schemaRef, err := g.GenerateSchemaRef(paramType)
+					if err != nil {
+						panic(err)
+					}
+					for ref := range g.SchemaRefs {
+						ref.Ref = ""
+					}
+
+					params.WithProperty(p.Name, schemaRef.Value)
+					if !p.Optional {
+						requiredParams = append(requiredParams, p.Name)
+					}
+				}
+				params.Required = requiredParams
+			}
+
+			// response
+			responseBody := openapi3.NewObjectSchema()
+			{
+				responseBody.Required = []string{"id", "jsonrpc"}
+
+				responseBody.WithProperty("id", openapi3.NewStringSchema())
+				responseBody.WithProperty("jsonrpc", openapi3.NewStringSchema().WithEnum("2.0"))
+
+				responseBody.WithProperty("error", openapi3.NewObjectSchema().
+					WithProperty("code", openapi3.NewInt64Schema()).
+					WithProperty("message", openapi3.NewStringSchema()))
+
+				var resultSchema *openapi3.Schema
+				if refMethodType.NumOut() > 0 {
+					resultType := refMethodType.Out(0)
+					g := openapi3gen.NewGenerator()
+					schemaRef, err := g.GenerateSchemaRef(resultType)
+					if err != nil {
+						panic(err)
+					}
+					for ref := range g.SchemaRefs {
+						ref.Ref = ""
+					}
+					resultSchema = schemaRef.Value
+				} else {
+					resultSchema = openapi3.NewObjectSchema()
+				}
+				responseBody.WithProperty("result", resultSchema)
+			}
+
+			swagger.Paths[p] = &openapi3.PathItem{
+				Post: &openapi3.Operation{
+					Summary:     method.Description,
+					Description: method.Description,
+					RequestBody: &openapi3.RequestBodyRef{
+						Value: &openapi3.RequestBody{
+							Required: true,
+							Content:  openapi3.NewContentWithJSONSchema(requestBody),
+						},
+					},
+					Responses: openapi3.Responses{
+						"200": &openapi3.ResponseRef{
+							Value: openapi3.NewResponse().WithJSONSchema(responseBody),
+						},
+					},
+				},
+			}
+		}
+	}
+
+	if s.options.PostProcessOpenAPI3Func != nil {
+		s.options.PostProcessOpenAPI3Func(swagger)
+	}
+	return swagger
 }
 
 // IsArray checks json message if it array or object.
