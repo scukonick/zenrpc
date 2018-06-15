@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/marusama/zenrpc/parser"
 	"text/template"
+
+	"github.com/marusama/zenrpc/parser"
 )
 
 var (
@@ -156,11 +157,13 @@ var RPC = struct {
 					}
 
 					{{ range .DefaultValues }}
-						{{.Comment}}
-						if args.{{.CapitalName}} == nil {
-							var v {{.Type}} = {{.Value}}
-							args.{{.CapitalName}} = &v
-						}
+						{{if not (eq .Value "nil")}}
+							{{.Comment}}
+							if args.{{.CapitalName}} == nil {
+								var v {{.Type}} = {{.Value}}
+								args.{{.CapitalName}} = &v
+							}
+						{{end}}
 					{{ end }}
 
 				{{ end }} {{if .Returns}}
