@@ -366,8 +366,7 @@ func (s Server) Swagger() *openapi2.Swagger {
 		}
 
 		// summary
-		tags := strings.Split(itemPath, "/")
-		item.Post.Summary = tags[len(tags)-1]
+		item.Post.Summary = strings.Replace(itemPath[1:], "/", ".", -1)
 	}
 
 	if s.options.PostProcessSwaggerFunc != nil {
