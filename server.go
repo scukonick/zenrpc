@@ -357,13 +357,16 @@ func (s Server) Swagger() *openapi2.Swagger {
 		swagger.Paths = correctPaths
 	}
 
-	// fill description
+	// fill description and summary
 	for itemPath, item := range swagger.Paths {
 		for code, resp := range item.Post.Responses {
 			if resp.Description == "" {
 				resp.Description = itemPath + "/" + code
 			}
 		}
+
+		// summary
+		item.Post.Summary = strings.Replace(itemPath[1:], "/", ".", -1)
 	}
 
 	if s.options.PostProcessSwaggerFunc != nil {
@@ -426,15 +429,31 @@ func (s Server) OpenAPI3() *openapi3.Swagger {
 					if err != nil {
 						panic(err)
 					}
+
 					for ref := range g.SchemaRefs {
 						ref.Ref = ""
 					}
 
-					params.WithProperty(p.Name, schemaRef.Value)
+					for name, item := range p.Properties {
+						if prop, ok := schemaRef.Value.Properties[name]; ok && len(item.Description) > 0 {
+							schema := &openapi3.Schema{}
+							*schema = *prop.Value
+							schema.Description = item.Description
+
+							schemaRef.Value.Properties[name] = &openapi3.SchemaRef{
+								Ref:   prop.Ref,
+								Value: schema,
+							}
+						}
+					}
+
 					if !p.Optional {
 						requiredParams = append(requiredParams, p.Name)
 					}
+
+					params.WithProperty(p.Name, schemaRef.Value)
 				}
+
 				params.Required = requiredParams
 			}
 
@@ -465,6 +484,20 @@ func (s Server) OpenAPI3() *openapi3.Swagger {
 				} else {
 					resultSchema = openapi3.NewObjectSchema()
 				}
+
+				for name, item := range method.Returns.Properties {
+					if prop, ok := resultSchema.Properties[name]; ok && len(item.Description) > 0 {
+						schema := &openapi3.Schema{}
+						*schema = *prop.Value
+						schema.Description = item.Description
+
+						resultSchema.Properties[name] = &openapi3.SchemaRef{
+							Ref:   prop.Ref,
+							Value: schema,
+						}
+					}
+				}
+
 				responseBody.WithProperty("result", resultSchema)
 			}
 
