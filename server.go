@@ -592,13 +592,13 @@ func ConvertToObject(keys []string, params json.RawMessage) (json.RawMessage, er
 	return buf.Bytes(), nil
 }
 
-// getItemRef get definition reference
+// getDefinitionRef get definition reference
 func getDefinitionRef(ref string) string {
 	lst := strings.Split(ref, "/")
 	return lst[len(lst)-1]
 }
 
-// setDescription set nested description
+// setNestedDescription set nested description
 func setNestedDescription(ref string, src map[string]smd.Definition, dst map[string]*openapi3.SchemaRef) {
 	if len(ref) > 0 {
 		for name, item := range src[ref].Properties {
