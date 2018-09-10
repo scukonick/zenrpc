@@ -435,15 +435,17 @@ func (s Server) OpenAPI3() *openapi3.Swagger {
 					}
 
 					for name, item := range p.Properties {
-						if prop, ok := schemaRef.Value.Properties[name]; ok && len(item.Description) > 0 {
-							schema := &openapi3.Schema{}
-							*schema = *prop.Value
-							schema.Description = item.Description
+						if prop, ok := schemaRef.Value.Properties[name]; ok {
+							if len(item.Description) > 0 {
+								schema := openapi3.Schema{}
+								schema = *prop.Value
+								schema.Description = item.Description
 
-							schemaRef.Value.Properties[name] = &openapi3.SchemaRef{
-								Ref:   prop.Ref,
-								Value: schema,
+								prop = &openapi3.SchemaRef{Ref: prop.Ref, Value: &schema}
+								schemaRef.Value.Properties[name] = prop
 							}
+							// nested item
+							setNestedDescription(getDefinitionRef(item.Ref), p.Definitions, prop.Value.Properties)
 						}
 					}
 
@@ -486,15 +488,17 @@ func (s Server) OpenAPI3() *openapi3.Swagger {
 				}
 
 				for name, item := range method.Returns.Properties {
-					if prop, ok := resultSchema.Properties[name]; ok && len(item.Description) > 0 {
-						schema := &openapi3.Schema{}
-						*schema = *prop.Value
-						schema.Description = item.Description
+					if prop, ok := resultSchema.Properties[name]; ok {
+						if len(item.Description) > 0 {
+							schema := openapi3.Schema{}
+							schema = *prop.Value
+							schema.Description = item.Description
 
-						resultSchema.Properties[name] = &openapi3.SchemaRef{
-							Ref:   prop.Ref,
-							Value: schema,
+							prop = &openapi3.SchemaRef{Ref: prop.Ref, Value: &schema}
+							resultSchema.Properties[name] = prop
 						}
+						// nested item
+						setNestedDescription(getDefinitionRef(item.Ref), method.Returns.Definitions, prop.Value.Properties)
 					}
 				}
 
@@ -586,6 +590,32 @@ func ConvertToObject(keys []string, params json.RawMessage) (json.RawMessage, er
 	}
 
 	return buf.Bytes(), nil
+}
+
+// getDefinitionRef get definition reference
+func getDefinitionRef(ref string) string {
+	lst := strings.Split(ref, "/")
+	return lst[len(lst)-1]
+}
+
+// setNestedDescription set nested description
+func setNestedDescription(ref string, src map[string]smd.Definition, dst map[string]*openapi3.SchemaRef) {
+	if len(ref) > 0 {
+		for name, item := range src[ref].Properties {
+			if prop, ok := dst[name]; ok {
+				if len(item.Description) > 0 {
+					schema := openapi3.Schema{}
+					schema = *prop.Value
+					schema.Description = item.Description
+
+					prop = &openapi3.SchemaRef{Ref: prop.Ref, Value: &schema}
+					dst[name] = prop
+				}
+				// nested item
+				setNestedDescription(getDefinitionRef(item.Ref), src, prop.Value.Properties)
+			}
+		}
+	}
 }
 
 // newRequestContext creates new context with http.Request.
