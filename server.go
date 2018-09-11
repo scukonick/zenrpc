@@ -445,7 +445,8 @@ func (s Server) OpenAPI3() *openapi3.Swagger {
 								schemaRef.Value.Properties[name] = prop
 							}
 							// nested item
-							setNestedDescription(getDefinitionRef(item.Ref), p.Definitions, prop.Value.Properties)
+							ref, _ := getDefinitionRefAndType(item)
+							setNestedDescription(ref, p.Definitions, prop.Value.Properties)
 						}
 					}
 
@@ -498,7 +499,8 @@ func (s Server) OpenAPI3() *openapi3.Swagger {
 							resultSchema.Properties[name] = prop
 						}
 						// nested item
-						setNestedDescription(getDefinitionRef(item.Ref), method.Returns.Definitions, prop.Value.Properties)
+						ref, _ := getDefinitionRefAndType(item)
+						setNestedDescription(ref, method.Returns.Definitions, prop.Value.Properties)
 					}
 				}
 
@@ -592,10 +594,18 @@ func ConvertToObject(keys []string, params json.RawMessage) (json.RawMessage, er
 	return buf.Bytes(), nil
 }
 
-// getDefinitionRef get definition reference
-func getDefinitionRef(ref string) string {
+// getDefinitionRef get definition reference and type
+func getDefinitionRefAndType(prop smd.Property) (string, string) {
+	var ref string
+
+	switch prop.Type {
+	case smd.Object:
+		ref = prop.Ref
+	case smd.Array:
+		ref = prop.Items["$ref"]
+	}
 	lst := strings.Split(ref, "/")
-	return lst[len(lst)-1]
+	return lst[len(lst)-1], prop.Type
 }
 
 // setNestedDescription set nested description
@@ -612,7 +622,12 @@ func setNestedDescription(ref string, src map[string]smd.Definition, dst map[str
 					dst[name] = prop
 				}
 				// nested item
-				setNestedDescription(getDefinitionRef(item.Ref), src, prop.Value.Properties)
+				switch ref, typ := getDefinitionRefAndType(item); typ {
+				case smd.Object:
+					setNestedDescription(ref, src, prop.Value.Properties)
+				case smd.Array:
+					setNestedDescription(ref, src, prop.Value.Items.Value.Properties)
+				}
 			}
 		}
 	}
