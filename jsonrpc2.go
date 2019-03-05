@@ -2,6 +2,8 @@ package zenrpc
 
 import (
 	"encoding/json"
+
+	"github.com/json-iterator/go"
 )
 
 const (
@@ -99,7 +101,7 @@ type Response struct {
 // JSON is temporary method that silences error during json marshalling.
 func (r Response) JSON() []byte {
 	// TODO process error
-	b, _ := json.Marshal(r)
+	b, _ := jsoniter.ConfigCompatibleWithStandardLibrary.Marshal(r)
 	return b
 }
 
@@ -195,7 +197,7 @@ func (r *Response) Set(v interface{}, er ...error) {
 	}
 
 	// set result or error on marshal
-	if res, err := json.Marshal(v); err != nil {
+	if res, err := jsoniter.ConfigCompatibleWithStandardLibrary.Marshal(v); err != nil {
 		r.Error = NewError(ServerError, err)
 	} else {
 		rm := json.RawMessage(res)

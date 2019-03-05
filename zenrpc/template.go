@@ -59,6 +59,7 @@ import (
 	"encoding/json"
 	"context"
 
+	"github.com/json-iterator/go"
 	"github.com/marusama/zenrpc"
 	"github.com/marusama/zenrpc/smd"
 
@@ -151,7 +152,7 @@ var RPC = struct {
 					}
 
 					if len(params) > 0 {
-						if err := json.Unmarshal(params, &args); err != nil {
+						if err := jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(params, &args); err != nil {
 							return zenrpc.NewResponseError(nil, zenrpc.InvalidParams, "", err.Error())
 						}
 					}

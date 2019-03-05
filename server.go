@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/gorilla/websocket"
+	"github.com/json-iterator/go"
 	"github.com/marusama/kin-openapi/openapi2"
 	"github.com/marusama/kin-openapi/openapi2conv"
 	"github.com/marusama/kin-openapi/openapi3"
@@ -173,7 +174,7 @@ func (s *Server) process(ctx context.Context, message json.RawMessage) interface
 	}
 
 	// unmarshal request(s)
-	if err := json.Unmarshal(message, &requests); err != nil {
+	if err := jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(message, &requests); err != nil {
 		return NewResponseError(nil, ParseError, "", nil)
 	}
 
@@ -554,7 +555,7 @@ func ConvertToObject(keys []string, params json.RawMessage) (json.RawMessage, er
 	paramCount := len(keys)
 
 	rawParams := []json.RawMessage{}
-	if err := json.Unmarshal(params, &rawParams); err != nil {
+	if err := jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(params, &rawParams); err != nil {
 		return nil, err
 	}
 

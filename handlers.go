@@ -1,13 +1,13 @@
 package zenrpc
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/json-iterator/go"
 )
 
 type Printer interface {
@@ -17,6 +17,9 @@ type Printer interface {
 // ServeHTTP process JSON-RPC 2.0 requests via HTTP.
 // http://www.simple-is-better.org/json-rpc/transport_http.html
 func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
+
 	// check for smd, swagger or openapi3 parameter and server settings and write schema if all conditions met,
 	if r.Method == http.MethodGet {
 		smd, swagger, openAPI3 := false, false, false
@@ -108,8 +111,10 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.printf("marshal json response failed with err=%v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else if _, err := w.Write(resp); err != nil {
-		s.printf("write response failed with err=%v", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		if !strings.HasSuffix(err.Error(), "write: broken pipe") {
+			s.printf("write response failed with err=%v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	}
 
 	return
@@ -124,6 +129,8 @@ func (s Server) ServeWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer c.Close()
+
+	var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 	for {
 		mt, message, err := c.ReadMessage()

@@ -2,9 +2,9 @@ package zenrpc_test
 
 import (
 	"bytes"
-	"encoding/json"
 	"testing"
 
+	"github.com/json-iterator/go"
 	"github.com/marusama/zenrpc"
 	"github.com/marusama/zenrpc/testdata"
 )
@@ -19,7 +19,7 @@ func init() {
 
 func TestServer_SMD(t *testing.T) {
 	r := rpc.SMD()
-	if b, err := json.Marshal(r); err != nil {
+	if b, err := jsoniter.ConfigCompatibleWithStandardLibrary.Marshal(r); err != nil {
 		t.Fatal(err)
 	} else if !bytes.Contains(b, []byte("default")) {
 		t.Error(string(b))
