@@ -3,15 +3,16 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/marusama/zenrpc/parser"
 	"go/format"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/marusama/zenrpc/parser"
 )
 
 const (
-	version = "1.0.1"
+	version = "1.2.1"
 
 	openIssueURL = "https://github.com/marusama/zenrpc/issues/new"
 	githubURL    = "https://github.com/marusama/zenrpc"

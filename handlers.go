@@ -111,7 +111,7 @@ func (s Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.printf("marshal json response failed with err=%v", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	} else if _, err := w.Write(resp); err != nil {
-		if !strings.HasSuffix(err.Error(), "write: broken pipe") {
+		if !strings.HasSuffix(err.Error(), "write: broken pipe") && !strings.HasSuffix(err.Error(), "write: connection reset by peer") {
 			s.printf("write response failed with err=%v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 		}
