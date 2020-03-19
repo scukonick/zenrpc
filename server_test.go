@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/json-iterator/go"
-	"github.com/marusama/zenrpc"
-	"github.com/marusama/zenrpc/testdata"
+	"github.com/scukonick/zenrpc"
+	"github.com/scukonick/zenrpc/testdata"
 )
 
 var rpc = zenrpc.NewServer(zenrpc.Options{BatchMaxLen: 5, AllowCORS: true})

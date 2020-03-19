@@ -3,8 +3,8 @@ package testdata
 import (
 	"context"
 	"errors"
-	"github.com/marusama/zenrpc"
-	"github.com/marusama/zenrpc/testdata/model"
+	"github.com/scukonick/zenrpc"
+	"github.com/scukonick/zenrpc/testdata/model"
 	"math"
 )
 

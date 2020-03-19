@@ -3,7 +3,7 @@ package main
 import (
 	"text/template"
 
-	"github.com/marusama/zenrpc/parser"
+	"github.com/scukonick/zenrpc/parser"
 )
 
 var (
@@ -60,8 +60,8 @@ import (
 	"context"
 
 	"github.com/json-iterator/go"
-	"github.com/marusama/zenrpc"
-	"github.com/marusama/zenrpc/smd"
+	"github.com/scukonick/zenrpc"
+	"github.com/scukonick/zenrpc/smd"
 
 	{{ range .ImportsForGeneration}}
 		{{if .Name}}{{.Name.Name}} {{end}}{{.Path.Value}}

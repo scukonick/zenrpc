@@ -8,14 +8,14 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/marusama/zenrpc/parser"
+	"github.com/scukonick/zenrpc/parser"
 )
 
 const (
 	version = "1.2.1"
 
-	openIssueURL = "https://github.com/marusama/zenrpc/issues/new"
-	githubURL    = "https://github.com/marusama/zenrpc"
+	openIssueURL = "https://github.com/scukonick/zenrpc/issues/new"
+	githubURL    = "https://github.com/scukonick/zenrpc"
 )
 
 func main() {

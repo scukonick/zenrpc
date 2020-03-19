@@ -6,10 +6,10 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/marusama/zenrpc"
-	"github.com/marusama/zenrpc/smd"
+	"github.com/scukonick/zenrpc"
+	"github.com/scukonick/zenrpc/smd"
 
-	"github.com/marusama/zenrpc/testdata/model"
+	"github.com/scukonick/zenrpc/testdata/model"
 )
 
 var RPC = struct {

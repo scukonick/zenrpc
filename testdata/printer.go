@@ -1,6 +1,6 @@
 package testdata
 
-import "github.com/marusama/zenrpc"
+import "github.com/scukonick/zenrpc"
 
 type PrintService struct{ zenrpc.Service }
 

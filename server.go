@@ -14,11 +14,11 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/json-iterator/go"
-	"github.com/marusama/kin-openapi/openapi2"
-	"github.com/marusama/kin-openapi/openapi2conv"
-	"github.com/marusama/kin-openapi/openapi3"
-	"github.com/marusama/kin-openapi/openapi3gen"
-	"github.com/marusama/zenrpc/smd"
+	"github.com/scukonick/kin-openapi/openapi2"
+	"github.com/scukonick/kin-openapi/openapi2conv"
+	"github.com/scukonick/kin-openapi/openapi3"
+	"github.com/scukonick/kin-openapi/openapi3gen"
+	"github.com/scukonick/zenrpc/smd"
 )
 
 type contextKey string
